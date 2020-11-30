@@ -1,15 +1,14 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Fri Oct 16 12:53:50 2020
 
-@author: murat
+"""
 """
 
-from sys import exit
-from zimbraMail import zimbraMail
 import json
+from sys import exit
 from os import path
+from time import sleep
+
+from zimbraMail import zimbraMail
 
 # Open Config
 if path.exists("config.json"):
@@ -32,16 +31,29 @@ try:
 except Exception as e:
     print("Error:", e)
     exit()
-finally:
-    mail.close()
 
-
-# todo: auto delete messages
-
+mailList = mail.getMailList()
 # write operation you want here
 
+# Configde belirttiğin, mail almak istemediğin kelimeleri seç
+for selectMailId in mail.selectWithWords(config["wordBlackList"]):
+    mail.selectMail(selectMailId)
+
+# Configde belirttiğin, mail almak istemediğin kullanıcıları seç
+for blackSender in config["senderBlackList"]:
+    for blackMailId in mail.selectWithSender(blackSender):
+        mail.selectMail(blackMailId)
+
+
+# Seçili mailleri sil
+print(*[tit["title"] for tit in mail.getSelectedMailList()], sep="\n")
+if input("Yukarıdaki mailler silinecektir. Onaylıyor musunuz? (y/n): ") == "y":
+    mail.clickDelete()
+    sleep(1)
+    print("Silindi")
 
 # Export csv data if chosen
+
 if config["exportCsvFile"] != "":
     mail.export(config["exportCsvFile"], config["lastExportTime"])
     config["lastExportTime"] = mail.strTimeNow()

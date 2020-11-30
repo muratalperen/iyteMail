@@ -1,20 +1,23 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Fri Oct 16 12:51:47 2020
 
-@author: murat
+"""
+zimbraMail
+~~~~~~~~~~~~~
+
+This module contains the Zimbra Mail operations.
 """
 
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException
 import datetime
 from os import path
+from time import sleep
 import re
 import csv
 
 
 class zimbraMail:
+    """Zimbra mail operations"""
     def __init__(self, username, password):
         
         self.DTF = "%d/%m/%Y %H:%M" # datetime format
@@ -39,7 +42,19 @@ class zimbraMail:
         self.driver.implicitly_wait(2)
         while len(self.driver.find_elements_by_css_selector("#zl__TV-main__rows")) == 0:
             self.driver.implicitly_wait(2)
-            
+        
+        # ----------- Go bottom so load all mails -----------
+        scrollScript = "var objDiv = document.getElementById('zl__TV-main__rows');objDiv.scrollTop = objDiv.scrollHeight;return objDiv.scrollHeight;"
+        lenOfPage = self.driver.execute_script(scrollScript)
+        match=False
+        while(match==False):
+            print("ileri")
+            lastCount = lenOfPage
+            sleep(2) # todo: implicitly_wait gibi daha mantıklı birşey
+            lenOfPage = self.driver.execute_script(scrollScript)
+            if lastCount==lenOfPage:
+                match=True
+
         # ----------- Get mail list -----------
         mailUl = self.driver.find_element_by_id("zl__TV-main__rows")
         self.mails = []
@@ -65,32 +80,106 @@ class zimbraMail:
                 "title"     : mailLi.find_element_by_id(zlifId + "__su").get_attribute('textContent'),
                 "text"      : mailLi.find_element_by_id(zlifId + "__fm").get_attribute('textContent')[3:]
             })
-        
+
+    def selectWithSender(self, sender):
+        """
+        Finds mails by sender name and returns mail id list.
+
+        :param sender: Sender name
+        """
+        for row in self.mails:
+            if row["sender"] == sender:
+                yield row["id"]
+
+    def selectWithWords(self, words):
+        """
+        Finds mails by word list.
+
+        :param sender: Sender name
+        """
+        for row in self.mails:
+            for word in words:
+                if re.search(word, row["title"], re.IGNORECASE):
+                    yield row["id"]
+                    break
+
     def clickDelete(self):
+        """Clicks delete button"""
         self.driver.execute_script("document.getElementById(\"zb__TV-main__DELETE\").click()")
     
     def selectMail(self, mailId):
-        self.driver.execute_script("document.getElementById('" + mailId.replace("zli", "zlif") + "__se').click()")
+        """
+        Makes mails selected by Id
+
+        :param mailId: id of mail
+        """
+        if not self.isMailSelected(mailId):
+            while not self.isMailSelected(mailId): # DEBUG: Sometimes first click not working so I added to while. And selenium click is slow
+                self.driver.execute_script("document.getElementById('" + mailId.replace("zli", "zlif") + "__se').click()")
+
+    def getSelectedMailList(self):
+        """Returns selected mails"""
+        for m in self.mails:
+            if self.isMailSelected(m["id"]):
+                yield m
     
     def getMailList(self):
+        """Returns all mails"""
         return self.mails
     
+    def isMailSelected(self, mailId):
+        """
+        Detects is mail given Id selected
+
+        :param mailId: Mail Id
+        """
+        return self.driver.find_element_by_css_selector("#" + mailId.replace("zli", "zlif") + "__se > div").get_attribute("class") == "ImgCheckboxChecked"
+    
     def export(self, logFile, lastSavingTime):
+        """
+        Exports mail infos to csv file
+
+        :param logFile: Csv folder name
+        :param lastSavingTime: last time mails are saved to csv file for adding only new mails
+        """
+        newCsv = False
         if not path.exists(logFile):
             open(logFile, "w").close()
+            newCsv = True
         with open(logFile, "a") as f:
-            writer = csv.DictWriter(f, fieldnames=list(self.mails[0].keys())[1:], extrasaction="ignore")
+            writer = csv.DictWriter(f, fieldnames=list(self.mails[0].keys())[1:], extrasaction="ignore", )
             writer.writeheader()
             savedTime = datetime.datetime.strptime(lastSavingTime, self.DTF)
-            for amail in self.mails:
+            for amail in self.mails[1:]:
                 mailDate = datetime.datetime.strptime(amail["date"] + " " + amail["hour"], self.DTF)
                 if savedTime < mailDate:
                     writer.writerow(amail)
-                    #print("Eklendi:", amail["title"])
+                    # DEBUG: bazı mailleri tekrar ekliyor print("Added Mail:", amail["title"])
+
+        # TODO: if csv file exists, Dictwriter adding col names again. find better solution
+        if not newCsv:
+            with open(logFile, "r") as r:
+                csvContent = r.read()
+                csvContent = csvContent.replace("read,flagged,attachment,date,hour,size,sender,title,text\n", "")
+                csvContent = "read,flagged,attachment,date,hour,size,sender,title,text\n" + csvContent
+            with open(logFile, "w") as w:
+                w.write(csvContent)
+                
+    def mailById(self, mId):
+        """
+        Finds mail by Id
+
+        :param mId: Mail Id
+        """
+        for m in self.mails:
+            if m["id"] == mId:
+                return m
     
     def strTimeNow(self):
+        """Returns now date as standart format"""
         return datetime.datetime.now().strftime(self.DTF)
             
     def close(self):
+        """Closes browser window"""
         self.driver.quit()
     
