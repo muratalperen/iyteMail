@@ -2,12 +2,11 @@
 
 Zimbra tabanlı Iyte mail kutusu hızla ve çoğu ilgilendirmeyen maillerle doluyor. Bu reponun amacı maillerle yapılacak işlemleri otomatiğe bağlamaktır.
 
-Python Selenium modülü ile yazılmıştır. İleride kullanılabilmesi için veriler csv olarak kaydedilebilir ve csv dosyası kullanılmak üzere repoda bulunmaktadır.
+Python Selenium modülü ile yazılmıştır. İleride kullanılabilmesi için veriler csv olarak kaydedilebilir.
 
 Kullanmak için config dosyasını kendinize göre düzenleyin:
 
 + Kullanıcı adı ve şifrenizi belirleyin
-+ İsterseniz bulunan csv dosyasını silip lastExportTime'ı eski herhangi bir zaman yapın
 + Gönderen ve kelime tabanlı black listinizi kendinize göre düzenleyin
 
 *zimbraMail.py* dosyasına girip selenium driver konumunu belirtin. `python3 filter.py` ile çalıştırın.
